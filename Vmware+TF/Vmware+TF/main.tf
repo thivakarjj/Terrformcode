@@ -93,3 +93,34 @@ resource "vsphere_virtual_machine" "vm" {
 output "my_ip_address" {
  value = "${vsphere_virtual_machine.vm.default_ip_address}"
 }
+
+
+
+##	Join to domain
+resource "azurerm_virtual_machine_extension" "azurerm_vme_sep_dom" {
+  name                 = "${azurerm_virtual_machine.azurevm.name}dom"
+  location             = "${var.location_name}"
+  resource_group_name  = "${var.resource_group_name}"
+  virtual_machine_name = "${azurerm_virtual_machine.azurevm.name}"
+  publisher            = "Microsoft.Compute"
+  type                 = "JsonADDomainExtension"
+  type_handler_version = "1.0"
+  depends_on           = ["azurerm_virtual_machine_extension.azurerm_vme_sep_ps"]
+  
+
+  settings = <<SETTINGS
+  {
+		"Name": "sas.local",
+		"User": "sas\\kingpin",
+		"Restart": "true",
+		"Options": "3",
+		"OUPath": "${var.ou_path}"
+	}
+    SETTINGS
+
+  protected_settings = <<PROTECTED_SETTINGS
+	{
+		"Password":  "${data.external.azure_secrets.result.sas-vm-joinad-password}"
+	}
+	PROTECTED_SETTINGS
+}
