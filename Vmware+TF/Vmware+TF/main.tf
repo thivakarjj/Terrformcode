@@ -124,3 +124,28 @@ resource "azurerm_virtual_machine_extension" "azurerm_vme_sep_dom" {
 	}
 	PROTECTED_SETTINGS
 }
+
+
+
+provisioner "remote-exec" {
+connection {
+type = "winrm"
+user = "Administrator"
+password = "${var.admin_password}"
+}
+inline = [
+"powershell -ExecutionPolicy Unrestricted -File C:\\ProgramData\\Amazon\\EC2-Windows\\Launch\\Scripts\\InitializeInstance.ps1 -Schedule"
+]
+}
+
+
+Get-Disk |Where-Object PartitionStyle -Eq "RAW" |Initialize-Disk -PassThru -PartitionStyle GPT |New-Partition  -UseMaximumSize |Format-Volume 
+$driveletters=@("D","E","F","G","H","i","J","K","L")
+$no_of_Disk=Get-Disk
+$j=2
+for($i=2;$i -lt $no_of_Disk.Count;$i++){
+
+Write-Host $i $driveletters[$j]
+Get-Disk -Number $i |Get-Partition |where {$_.type -eq "Basic"}|  Set-Partition -NewDriveLetter $driveletters[$j] -Confirm:$false
+$j++
+}
