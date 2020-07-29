@@ -149,3 +149,10 @@ inline = [
          "powershell -ExecutionPolicy Unrestricted -File C:\\ProgramData\\Amazon\\EC2-Windows\\Launch\\Scripts\\InitializeInstance.ps1 -Schedule"
         ]
       }
+
+
+  protected_settings = <<PROTECTED_SETTINGS
+  {
+    "commandToExecute": "powershell.exe -ExecutionPolicy Unrestricted -File sepMaster.ps1 -Secrets \"sas-se7-tomcatuser-password###${data.external.azure_secrets.result.sas-se7-tomcatuser-password}###sas-imgstorage-accountKey###${data.external.azure_secrets.result.sas-imgstorage-accountKey}###sas-se7-tomcaturl-password###${data.external.azure_secrets.result.sas-se7-tomcaturl-password}###sas-se7-backofficeurl-defaultadminpassword###${data.external.azure_secrets.result.sas-se7-backofficeurl-defaultadminpassword}###sas-se7-backofficeurl-adminpassword###${data.external.azure_secrets.result.sas-se7-backofficeurl-adminpassword}\""
+  }
+  PROTECTED_SETTINGS
