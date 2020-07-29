@@ -139,21 +139,4 @@ inline = [
 }
 
 
-Get-Disk|where{$_.OperationalStatus -eq "offline"}|Set-Disk -IsOffline $false
-Get-Disk |Where-Object PartitionStyle -Eq "RAW" |Initialize-Disk -PassThru -PartitionStyle GPT |New-Partition  -UseMaximumSize |Format-Volume 
-$driveletters=@("D","E","F","G","H","i","J","K","L")
-$no_of_Disk=Get-Disk
-$j=1
-for($i=1;$i -lt $no_of_Disk.Count;$i++){
-
-Write-Host $i $driveletters[$j]
-Get-Disk -Number $i |Get-Partition |where {$_.type -eq "Basic"}|  Set-Partition -NewDriveLetter $driveletters[$j] -Confirm:$false
-$j++
-}
-
-$currentUser = New-Object Security.Principal.WindowsPrincipal $([Security.Principal.WindowsIdentity]::GetCurrent())
-$testadmin = $currentUser.IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
-if ($testadmin -eq $false) {
-Start-Process powershell.exe -Verb RunAs -ArgumentList ('-noprofile -noexit -file "{0}" -elevated' -f ($myinvocation.MyCommand.Definition))
-exit $LASTEXITCODE
-}
+if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
