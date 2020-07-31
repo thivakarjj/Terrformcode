@@ -138,21 +138,14 @@ inline = [
 ]
 }
 
-provisioner "remote-exec" {
-    connection {
-      type     = "winrm"
-      user     = "Administrator"
-      password = "${var.admin_password}"
-    }
+Get-Disk|where{$_.OperationalStatus -eq "offline"}|Set-Disk -IsOffline $false
+Get-Disk |Where-Object PartitionStyle -Eq "RAW" |Initialize-Disk -PassThru -PartitionStyle GPT |New-Partition  -UseMaximumSize |Format-Volume 
+$driveletters=@("D","E","F","G","H","i","J","K","L")
+$no_of_Disk=Get-Disk
+$j=2
+for($i=2;$i -lt $no_of_Disk.Count;$i++){
+$j=1
+for($i=1;$i -lt $no_of_Disk.Count;$i++){
 
-inline = [
-         "powershell -ExecutionPolicy Unrestricted -File C:\\ProgramData\\Amazon\\EC2-Windows\\Launch\\Scripts\\InitializeInstance.ps1 -Schedule"
-        ]
-      }
-
-
-  protected_settings = <<PROTECTED_SETTINGS
-  {
-    "commandToExecute": "powershell.exe -ExecutionPolicy Unrestricted -File sepMaster.ps1 -Secrets \"sas-se7-tomcatuser-password###${data.external.azure_secrets.result.sas-se7-tomcatuser-password}###sas-imgstorage-accountKey###${data.external.azure_secrets.result.sas-imgstorage-accountKey}###sas-se7-tomcaturl-password###${data.external.azure_secrets.result.sas-se7-tomcaturl-password}###sas-se7-backofficeurl-defaultadminpassword###${data.external.azure_secrets.result.sas-se7-backofficeurl-defaultadminpassword}###sas-se7-backofficeurl-adminpassword###${data.external.azure_secrets.result.sas-se7-backofficeurl-adminpassword}\""
-  }
-  PROTECTED_SETTINGS
+Write-Host $i $driveletters[$j]
+Get-Disk -Number $i |Get-Partition |where {$_.type -eq "Basic"}|  Set-Partition -NewDriveLetter $driveletters[$j] -Confirm:$false
