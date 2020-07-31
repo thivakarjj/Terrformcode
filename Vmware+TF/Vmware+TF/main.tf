@@ -138,12 +138,11 @@ inline = [
 ]
 }
 
+
 Get-Disk|where{$_.OperationalStatus -eq "offline"}|Set-Disk -IsOffline $false
 Get-Disk |Where-Object PartitionStyle -Eq "RAW" |Initialize-Disk -PassThru -PartitionStyle GPT |New-Partition  -UseMaximumSize |Format-Volume 
 $driveletters=@("D","E","F","G","H","i","J","K","L")
 $no_of_Disk=Get-Disk
-$j=2
-for($i=2;$i -lt $no_of_Disk.Count;$i++){
 $j=1
 for($i=1;$i -lt $no_of_Disk.Count;$i++){
 
