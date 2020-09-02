@@ -1,4 +1,3 @@
-Updated script attached
 $server_Name=$env:COMPUTERNAME
 [int]$allocation_unit=0
 if($server_Name -match 'db'){
@@ -21,6 +20,6 @@ $j=0
 for($i=1;$i -lt $no_of_Disk.Count;$i++){
 
 Write-Host $i $driveletters[$i]
-Get-Disk -Number $i |Get-Partition |where {$_.type -eq "Basic"}|  Set-Partition -NewDriveLetter $driveletters[$i] -Confirm:$false
+Get-Disk -Number $i |Get-Partition |where {$_.type -eq "Basic"}|  Set-Partition -NewDriveLetter $driveletters[$i]
 $j=$j+1
 }
