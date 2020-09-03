@@ -23,3 +23,5 @@ Write-Host $i $driveletters[$i]
 Get-Disk -Number $i |Get-Partition |where {$_.type -eq "Basic"}|  Set-Partition -NewDriveLetter $driveletters[$i]
 $j=$j+1
 }
+
+https://colab.research.google.com/drive/1bg846F7wdwgkmPyqLcvkRUH8mGhgZkAc
