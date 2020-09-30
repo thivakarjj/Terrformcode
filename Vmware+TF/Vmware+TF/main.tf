@@ -1,150 +1,84 @@
-# The Provider block sets up the vSphere provider - How to connect to vCenter. Note the use of
-# variables to avoid hardcoding credentials here
 
-provider "vsphere" {
-  user           = "${var.vsphere_user}"
-  password       = "${var.vsphere_password}"
-  vsphere_server = "${var.vsphere_server}"
-  allow_unverified_ssl = true
-}
-
-# The Data sections are about determining where the virtual machine will be placed. 
-# Here we are naming the vSphere DC, the cluster, datastore, virtual network and the template
-# name. These are called upon later when provisioning the VM resource
-
-data "vsphere_datacenter" "dc" {
-  name = "DC"
-}
-
-data "vsphere_datastore" "datastore" {
-  name          = var.datastore
-  datacenter_id = "${data.vsphere_datacenter.dc.id}"
-}
-
-data "vsphere_compute_cluster" "cluster" {
-  name          = var.cluster
-  datacenter_id = "${data.vsphere_datacenter.dc.id}"
-}
-
-data "vsphere_network" "network" {
-  name          = var.network
-  datacenter_id = "${data.vsphere_datacenter.dc.id}"
-}
-
-//  This is to find out the UUId of the VM tempalte used to deploy the VM
-
-data "vsphere_virtual_machine" "template" {
-  name          = var.templatename
-  datacenter_id = "${data.vsphere_datacenter.dc.id}"
-}
-
-# The Resource section creates the virtual machine, in this case 
-# from a template
-
-resource "vsphere_virtual_machine" "vm" {
-  name             = "${var.servername}"
-  resource_pool_id = "${data.vsphere_compute_cluster.cluster.resource_pool_id}"
-  datastore_id     = "${data.vsphere_datastore.datastore.id}"
-
-  num_cpus = 2
-  memory   = 4096
-  guest_id = "${data.vsphere_virtual_machine.template.guest_id}"
-  scsi_type = "${data.vsphere_virtual_machine.template.scsi_type}"
-
-  network_interface {
-    network_id   = "${data.vsphere_network.network.id}"
-    adapter_type = "${data.vsphere_virtual_machine.template.network_interface_types[0]}"
-  }
-
-  disk {
-    label            = "disk0"
-    size             = "${data.vsphere_virtual_machine.template.disks.0.size}"
-    eagerly_scrub    = "${data.vsphere_virtual_machine.template.disks.0.eagerly_scrub}"
-    thin_provisioned = "${data.vsphere_virtual_machine.template.disks.0.thin_provisioned}"
-  }
-
-  clone {
-    template_uuid = "${data.vsphere_virtual_machine.template.id}"
-
-    customize {
-      windows_options {
-        computer_name  = "terraform-test"
-        workgroup      = "test"
-        admin_password = "VMw4re1234###"
-        //join_domain - (Optional) The domain to join for this virtual machine. One of this or workgroup must be included.
-       // https://www.terraform.io/docs/providers/vsphere/r/virtual_machine.html#creating-a-virtual-machine-from-a-template
-      }
+"""
+vSphere Python SDK program for listing  Datastore Cluster
+"""
+import argparse
+import atexit
+import ssl
+import requests
+import random
+from pyVmomi import vim
+from pyVmomi import vmodl
+from pyVim import connect
 
 
-      network_interface {}
-    }
-  }
-}
+def get_args():
+    """
+   Supports the command-line arguments listed below.
+   """
+    parser = argparse.ArgumentParser(
+        description='Process args for retrieving all SDRS Clusters')
 
-# This resource exists to call the file and remote-exec Terraform provisioners. This runs after
-# the virtual machine resource has been created. It uses the file provisioner to copy a .rpm file stored
-# locally to the newly created server, then uses the remote exec provisioner to run the commands necessary
-# to install the rpm
+    parser.add_argument('-s', '--host',
+                        required=True, action='store',
+                        help='Remote host to connect to')
 
+    parser.add_argument('-o', '--port',
+                        type=int, default=443,
+                        action='store', help='Port to connect on')
 
+    parser.add_argument('-u', '--user', required=True,
+                        action='store',
+                        help='User name to use when connecting to host')
 
-# Finally, we're outputting the IP address of the new VM
+    parser.add_argument('-p', '--password',
+                        required=True, action='store',
+                        help='Password to use when connecting to host')
+    args = parser.parse_args()
+    return args
+def get_all_objs(content, vimtype):
+        obj = {}
+        container = content.viewManager.CreateContainerView(content.rootFolder, vimtype, True)
+        for managed_object_ref in container.view:
+                obj.update({managed_object_ref: managed_object_ref.name})
+        return obj
+def get_SDRS_Random(Clusters):
+    tmp_sdrs=[]
+    for cls in Clusters:
+        tmp_sdrs.append(cls.name)
+    return random.choice(tmp_sdrs)
+def main():
+    """
+   Simple command-line program for listing Datastores in Datastore Cluster
+   """
+    ssl._create_default_https_context = ssl._create_unverified_context
+    context = ssl.create_default_context()
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    requests.packages.urllib3.disable_warnings()
+    args = get_args()
 
-output "my_ip_address" {
- value = "${vsphere_virtual_machine.vm.default_ip_address}"
-}
+    try:
+        service_instance = connect.SmartConnect(host=args.host,
+                                                user=args.user,
+                                                pwd=args.password,
+                                                port=int(args.port))
+        if not service_instance:
+            print("Could not connect to the specified host using "
+                  "specified username and password")
+            return -1
 
+        atexit.register(connect.Disconnect, service_instance)
+        content = service_instance.RetrieveContent()
+        datastore_Clusters = get_all_objs(content, [vim.StoragePod])
+        sdrs_cluster=get_SDRS_Random(datastore_Clusters)
+        print(sdrs_cluster)
+    except vmodl.MethodFault as error:
+        print ("Caught vmodl fault : " + error.msg)
+        return -1
 
+    return 0
 
-##	Join to domain
-resource "azurerm_virtual_machine_extension" "azurerm_vme_sep_dom" {
-  name                 = "${azurerm_virtual_machine.azurevm.name}dom"
-  location             = "${var.location_name}"
-  resource_group_name  = "${var.resource_group_name}"
-  virtual_machine_name = "${azurerm_virtual_machine.azurevm.name}"
-  publisher            = "Microsoft.Compute"
-  type                 = "JsonADDomainExtension"
-  type_handler_version = "1.0"
-  depends_on           = ["azurerm_virtual_machine_extension.azurerm_vme_sep_ps"]
-  
-
-  settings = <<SETTINGS
-  {
-		"Name": "sas.local",
-		"User": "sas\\kingpin",
-		"Restart": "true",
-		"Options": "3",
-		"OUPath": "${var.ou_path}"
-	}
-    SETTINGS
-
-  protected_settings = <<PROTECTED_SETTINGS
-	{
-		"Password":  "${data.external.azure_secrets.result.sas-vm-joinad-password}"
-	}
-	PROTECTED_SETTINGS
-}
-
-
-
-provisioner "remote-exec" {
-connection {
-type = "winrm"
-user = "Administrator"
-password = "${var.admin_password}"
-}
-inline = [
-"powershell -ExecutionPolicy Unrestricted -File C:\\ProgramData\\Amazon\\EC2-Windows\\Launch\\Scripts\\InitializeInstance.ps1 -Schedule"
-]
-}
-
-
-Get-Disk|where{$_.OperationalStatus -eq "offline"}|Set-Disk -IsOffline $false
-Get-Disk |Where-Object PartitionStyle -Eq "RAW" |Initialize-Disk -PassThru -PartitionStyle GPT |New-Partition  -UseMaximumSize |Format-Volume 
-$driveletters=@("D","E","F","G","H","i","J","K","L")
-$no_of_Disk=Get-Disk
-$j=1
-for($i=1;$i -lt $no_of_Disk.Count;$i++){
-
-Write-Host $i $driveletters[$j]
-Get-Disk -Number $i |Get-Partition |where {$_.type -eq "Basic"}|  Set-Partition -NewDriveLetter $driveletters[$j] -Confirm:$false
+# Start program
+if __name__ == "__main__":
+    main()
