@@ -1,23 +1,24 @@
-
+#Author:BhanuPrakash
+#reference https://code.vmware.com/home
+#website:https://vexpert.dev
 """
-vSphere Python SDK program for listing  Compute Cluster
+vSphere Python SDK program for listing Datastores in Datastore Cluster
 """
 import argparse
 import atexit
 import ssl
-import requests
-import random
 from pyVmomi import vim
 from pyVmomi import vmodl
 from pyVim import connect
-
+sslContext=ssl.create_default_context(purpose=ssl.purpose.CLIENT_AUTH)
+sslContext.verify_mode=ssl.CERT_NONE
 
 def get_args():
     """
    Supports the command-line arguments listed below.
    """
     parser = argparse.ArgumentParser(
-        description='Process args for retrieving all SDRS Clusters')
+        description='Process args for retrieving all the Virtual Machines')
 
     parser.add_argument('-s', '--host',
                         required=True, action='store',
@@ -34,47 +35,52 @@ def get_args():
     parser.add_argument('-p', '--password',
                         required=True, action='store',
                         help='Password to use when connecting to host')
+
     args = parser.parse_args()
     return args
-def get_all_objs(content, vimtype):
-        obj = {}
-        container = content.viewManager.CreateContainerView(content.rootFolder, vimtype, True)
-        for managed_object_ref in container.view:
-                obj.update({managed_object_ref: managed_object_ref.name})
-        return obj
-def get_Compute_Random(Clusters):
-    tmp_sdrs=[]
-    for cls in Clusters:
-        tmp_sdrs.append(cls.name)
-    return random.choice(tmp_sdrs)
+
+
 def main():
-    """
-   Simple command-line program for listing Datastores in Datastore Cluster
-   """
-    ssl._create_default_https_context = ssl._create_unverified_context
-    context = ssl.create_default_context()
-    context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE
-    requests.packages.urllib3.disable_warnings()
+    
+
     args = get_args()
 
     try:
         service_instance = connect.SmartConnect(host=args.host,
                                                 user=args.user,
                                                 pwd=args.password,
-                                                port=int(args.port))
+                                                port=int(args.port),sslContext=sslContext)
         if not service_instance:
             print("Could not connect to the specified host using "
                   "specified username and password")
             return -1
 
         atexit.register(connect.Disconnect, service_instance)
+
         content = service_instance.RetrieveContent()
-        Compute_Clusters = get_all_objs(content, [vim.ClusterComputeResource])
-        Compute_Cluster=get_Compute_Random(Compute_Clusters)
-        print(Compute_Cluster)
+        # Search for all Datastore Clusters aka StoragePod
+        obj_view = content.viewManager.CreateContainerView(content.rootFolder,
+                                                           [vim.StoragePod],
+                                                           True)
+        ds_cluster_list = obj_view.view
+        obj_view.Destroy()
+        ds_dict={}
+        for ds_cluster in ds_cluster_list:
+                for datastore in datastores:
+                    if(datastore.summary.multipleHostAccess==True):
+                        summary=datastore.summary
+                        ds_capacity=summary.capacity
+                        ds_freespace=summary.freespace
+                        percentfree=round(((ds_freespace/ds_capacity)*100),2)
+                        tmp={summary.name:percentfree}
+                        ds_dict.update(tmp)
+                    else:
+                        print("LocalDS:{}".format(datastore.summary.name))
+        sorted_ds_dict=sorted(ds_dict.items()),key=lambda x:x[1],reverse=True)
+        print(next(iter(sorted_ds_dict))[0])
+
     except vmodl.MethodFault as error:
-        print ("Caught vmodl fault : " + error.msg)
+        print "Caught vmodl fault : " + error.msg
         return -1
 
     return 0
