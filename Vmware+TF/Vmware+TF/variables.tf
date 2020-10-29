@@ -1,6 +1,4 @@
-#Author:BhanuPrakash
-#reference https://code.vmware.com/home
-#website:https://vexpert.dev
+
 """
 vSphere Python SDK program for listing Datastores in Datastore Cluster
 """
@@ -18,11 +16,10 @@ def get_args():
    Supports the command-line arguments listed below.
    """
     parser = argparse.ArgumentParser(
-        description='Process args for retrieving all the Virtual Machines')
-
-    parser.add_argument('-s', '--host',
-                        required=True, action='store',
-                        help='Remote host to connect to')
+        description='Reading the arguements for getting DS name')
+    parser.add_argument('-d', '--dc', required=True,
+                        action='store',
+                        help='Please input the DC Name')
 
     parser.add_argument('-o', '--port',
                         type=int, default=443,
@@ -44,45 +41,64 @@ def main():
     
 
     args = get_args()
-
-    try:
-        service_instance = connect.SmartConnect(host=args.host,
+    dc01=["vc01","vc02"]
+    dc02=["vc03","vc04"]
+    dc02=["vc05","vc06"]
+    if(args.dc=="dc01"):
+      vCenters=dc01
+    elif(args.dc=="dc02"):
+      vCenters=dc02
+    elif(args.dc=="dc03"):
+      vCenters=dc03
+    else:
+      print("invalid input")
+      
+    global_ds_names={}
+    for vc in vCenters:
+        print(vc)
+        try:
+         service_instance = connect.SmartConnect(host=vc,
                                                 user=args.user,
                                                 pwd=args.password,
                                                 port=int(args.port),sslContext=sslContext)
-        if not service_instance:
+         if not service_instance:
             print("Could not connect to the specified host using "
                   "specified username and password")
             return -1
 
-        atexit.register(connect.Disconnect, service_instance)
+         atexit.register(connect.Disconnect, service_instance)
 
-        content = service_instance.RetrieveContent()
+         content = service_instance.RetrieveContent()
         # Search for all Datastore Clusters aka StoragePod
-        obj_view = content.viewManager.CreateContainerView(content.rootFolder,
+         obj_view = content.viewManager.CreateContainerView(content.rootFolder,
                                                            [vim.StoragePod],
                                                            True)
-        ds_cluster_list = obj_view.view
-        obj_view.Destroy()
-        ds_dict={}
-        for ds_cluster in ds_cluster_list:
-                for datastore in datastores:
+         ds_cluster_list = obj_view.view
+         obj_view.Destroy()
+         ds_dict={}
+         exclude_ds_list=['dscluter1','dscluster2']
+         for ds_cluster in ds_cluster_list:
+             datastores=ds_cluster.childEntity
+             if ds_cluster.name in exclude_ds_list:
+                 continue
+                 for datastore in datastores:
                     if(datastore.summary.multipleHostAccess==True):
                         summary=datastore.summary
                         ds_capacity=summary.capacity
                         ds_freespace=summary.freespace
-                        percentfree=round(((ds_freespace/ds_capacity)*100),2)
-                        tmp={summary.name:percentfree}
+                        ds_freespace_gb=round(((ds_freespace/1024)/1024)/1024,2)
+                        tmp={summary.name:ds_freespace_gb}
                         ds_dict.update(tmp)
                     else:
                         print("LocalDS:{}".format(datastore.summary.name))
-        sorted_ds_dict=sorted(ds_dict.items()),key=lambda x:x[1],reverse=True)
-        print(next(iter(sorted_ds_dict))[0])
-
-    except vmodl.MethodFault as error:
-        print "Caught vmodl fault : " + error.msg
-        return -1
-
+         sorted_ds_dict=sorted((ds_dict.items()),key=lambda x:x[1],reverse=True)
+         tmp_update={sorted_ds_dict[0][0]:sorted_ds_dict[0][1]}
+         global_ds_names.update(tmp_update)
+        except vmodl.MethodFault as error:
+            print("Caught vmodl fault : " + error.msg)
+            return -1
+    sorted_global_ds_names=sorted((global_ds_names.items()),key=lambda x:x[1],reverse=True)
+    print(sorted_global_ds_names[0][0])
     return 0
 
 # Start program
