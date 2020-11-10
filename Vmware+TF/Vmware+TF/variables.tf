@@ -1,4 +1,7 @@
-
+#@title Default title text
+#Author:BhanuPrakash
+#reference https://code.vmware.com/home
+#website:https://vexpert.dev
 """
 vSphere Python SDK program for listing Datastores in Datastore Cluster
 """
@@ -43,7 +46,7 @@ def main():
     args = get_args()
     dc01=["vc01","vc02"]
     dc02=["vc03","vc04"]
-    dc02=["vc05","vc06"]
+    dc03=["vc05","vc06"]
     if(args.dc=="dc01"):
       vCenters=dc01
     elif(args.dc=="dc02"):
@@ -76,22 +79,22 @@ def main():
          ds_cluster_list = obj_view.view
          obj_view.Destroy()
          ds_dict={}
-         exclude_ds_list=['dscluter1','dscluster2']
          for ds_cluster in ds_cluster_list:
              datastores=ds_cluster.childEntity
-             if ds_cluster.name in exclude_ds_list:
-                 continue
-                 for datastore in datastores:
-                    if(datastore.summary.multipleHostAccess==True):
-                        summary=datastore.summary
-                        ds_capacity=summary.capacity
-                        ds_freespace=summary.freespace
-                        ds_freespace_gb=round(((ds_freespace/1024)/1024)/1024,2)
-                        tmp={summary.name:ds_freespace_gb}
-                        ds_dict.update(tmp)
-                    else:
-                        print("LocalDS:{}".format(datastore.summary.name))
+              for datastore in datastores:
+                if(datastore.summary.multipleHostAccess==True):
+                  summary=datastore.summary
+                  ds_capacity=summary.capacity
+                  ds_freespace=summary.freespace
+                  ds_freespace_gb=round(((ds_freespace/1024)/1024)/1024,2)
+                  print(summary.name,ds_freespace_gb)
+                  tmp={summary.name:ds_freespace_gb}
+                  ds_dict.update(tmp)
+                else:
+                  pass
+                    
          sorted_ds_dict=sorted((ds_dict.items()),key=lambda x:x[1],reverse=True)
+         print("sorted_ds_dict:"sorted_ds_dict)
          tmp_update={sorted_ds_dict[0][0]:sorted_ds_dict[0][1]}
          global_ds_names.update(tmp_update)
         except vmodl.MethodFault as error:
