@@ -38,7 +38,11 @@ def get_args():
 
     args = parser.parse_args()
     return args
-
+def get_vim_objects(content, vim_type):
+    '''Get vim objects of a given type.'''
+    return [item for item in content.viewManager.CreateContainerView(
+        content.rootFolder, [vim_type], recursive=True
+    )
 
 def main():
     
@@ -56,7 +60,7 @@ def main():
     else:
       print("invalid input")
       
-    global_ds_names={}
+    global_vc_names={}
     for vc in vCenters:
         print(vc)
         try:
@@ -72,36 +76,32 @@ def main():
          atexit.register(connect.Disconnect, service_instance)
 
          content = service_instance.RetrieveContent()
-        # Search for all Datastore Clusters aka StoragePod
-         obj_view = content.viewManager.CreateContainerView(content.rootFolder,
-                                                           [vim.StoragePod],
-                                                           True)
-         ds_cluster_list = obj_view.view
-         obj_view.Destroy()
-         ds_dict={}
-         for ds_cluster in ds_cluster_list:
-             datastores=ds_cluster.childEntity
-              for datastore in datastores:
-                if(datastore.summary.multipleHostAccess==True):
-                  summary=datastore.summary
-                  ds_capacity=summary.capacity
-                  ds_freespace=summary.freespace
-                  ds_freespace_gb=round(((ds_freespace/1024)/1024)/1024,2)
-                  print(summary.name,ds_freespace_gb)
-                  tmp={summary.name:ds_freespace_gb}
-                  ds_dict.update(tmp)
-                else:
-                  pass
-                    
-         sorted_ds_dict=sorted((ds_dict.items()),key=lambda x:x[1],reverse=True)
-         print("sorted_ds_dict:"sorted_ds_dict)
-         tmp_update={sorted_ds_dict[0][0]:sorted_ds_dict[0][1]}
-         global_ds_names.update(tmp_update)
+         tmp_comp_dict={}
+         for vm in get_vim_objects(content,vim.ComputeResource):
+           memUsedMB=vm.GetResourceUsage().memUsedMB
+           memCapacityMB=vm.GetResourceUsage().memCapacityMB
+           memFreeMB=memCapacityMB-memUsedMB
+           tmp={vm.name:memFreeMB}
+           tmp_comp_dict.update(tmp)
+          keymax=max(tmp_comp_dict,key=tmp_comp_dict.get)
+          print(keymax)
+          tmp_ds_dict={}
+          for ds in get_vim_objects(content,vim.ComputeResource):
+            if ds.name==keymax:
+              for ds1 in ds.datastore:
+                if ds1.summary.multipleHostAccess:
+                  tmp_ds={ds1.name;ds1.info.freeSpace}
+                  tmp_ds_dict.update(tmp_ds)
+          ds_keymax=max(tmp_ds_dict,key=tmp_ds_dict.get)
+          print(ds_keymax)
+          tmp_vc={vc:tmp_ds_dict[ds_keymax]}
+          global_vc_names.update(tmp_vc)
         except vmodl.MethodFault as error:
             print("Caught vmodl fault : " + error.msg)
             return -1
-    sorted_global_ds_names=sorted((global_ds_names.items()),key=lambda x:x[1],reverse=True)
-    print(sorted_global_ds_names[0][0])
+    print(global_vc_names)
+    vc_keymax=max(global_vc_names,key=global_vc_names.get)
+    print(vc_keymax)
     return 0
 
 # Start program
